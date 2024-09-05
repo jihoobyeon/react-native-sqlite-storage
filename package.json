@@ -23,7 +23,7 @@
     "promise",
     "cordova-sqlite-storage"
   ],
-  "author": ["Andrzej Porebski", "Jihoo Byeon"]
+  "author": ["Andrzej Porebski", "Jihoo Byeon"],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/jihoobyeon/react-native-sqlite-storage/issues"
