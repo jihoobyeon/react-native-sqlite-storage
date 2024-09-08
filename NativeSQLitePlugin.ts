@@ -1,17 +1,14 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
-type Location = "default" | "Library" | "Documents" | "Shared";
 interface DatabaseOptionalParams {
-    createFromLocation?: number | string | undefined;
+    createFromLocation?: string;
     // Database encryption pass phrase
-    key?: string | undefined;
-    readOnly?: boolean | undefined;
+    key?: string;
+    readOnly?: boolean;
 }
 
-type DatabaseParams = DatabaseParamsIOS | DatabaseParamsAndroid;
-
-interface DatabaseParamsIOS extends DatabaseOptionalParams {
+interface DatabaseParams extends DatabaseOptionalParams {
     name: string;
     /**
      * Affects iOS database file location
@@ -19,11 +16,7 @@ interface DatabaseParamsIOS extends DatabaseOptionalParams {
      * 'Library': Library subdirectory - backed up by iCloud, NOT visible to iTunes
      * 'Documents': Documents subdirectory - visible to iTunes and backed up by iCloud
      */
-    location: Location;
-}
-
-interface DatabaseParamsAndroid extends DatabaseOptionalParams {
-    name: string;
+    location: string;
 }
 
 interface ResultSet {
