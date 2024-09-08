@@ -10,70 +10,62 @@ using namespace winrt::Windows::Security::Cryptography;
 
 namespace winrt::SQLitePlugin
 {
-
   void winrt::SQLitePlugin::SQLite::Attach(
     DatabaseAttachOptions options,
     std::function<void(std::string)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) },
-          onFailure{ std::move(onFailure) },
-          weak_this = std::weak_ptr(shared_from_this())
-      ]()
+    auto weak_this = std::weak_ptr(shared_from_this());
+      
+    if (auto strongThis = weak_this.lock()) {
+
+      if (options.MainDB == "")
       {
-        if (auto strongThis = weak_this.lock()) {
+        onFailure("You must specify a database to attach to");
+        return;
+      }
 
-          if (options.MainDB == "")
-          {
-            onFailure("You must specify a database to attach to");
-            return;
-          }
+      if (options.DBAlias == "")
+      {
+        onFailure("You must specify a database alias to use");
+        return;
+      }
 
-          if (options.DBAlias == "")
-          {
-            onFailure("You must specify a database alias to use");
-            return;
-          }
+      if (options.DBFileToAttach == "")
+      {
+        onFailure("You must specify database to attach");
+        return;
+      }
 
-          if (options.DBFileToAttach == "")
-          {
-            onFailure("You must specify database to attach");
-            return;
-          }
+      hstring absoluteDbPath;
+      absoluteDbPath = ResolveDbFilePath(to_hstring(options.MainDB));
 
-          hstring absoluteDbPath;
-          absoluteDbPath = ResolveDbFilePath(to_hstring(options.MainDB));
+      if (strongThis->openDBs.find(absoluteDbPath) == strongThis->openDBs.end())
+      {
+        onFailure("No such database, you must open it first");
+        return;
+      }
 
-          if (strongThis->openDBs.find(absoluteDbPath) == strongThis->openDBs.end())
-          {
-            onFailure("No such database, you must open it first");
-            return;
-          }
+      hstring absoluteDbPathToAttach;
+      absoluteDbPathToAttach = ResolveDbFilePath(to_hstring(options.DBFileToAttach));
 
-          hstring absoluteDbPathToAttach;
-          absoluteDbPathToAttach = ResolveDbFilePath(to_hstring(options.DBFileToAttach));
+      std::string statement = ("ATTACH DATABASE '" + to_string(absoluteDbPathToAttach) + "' AS " + options.DBAlias);
 
-          std::string statement = ("ATTACH DATABASE '" + to_string(absoluteDbPathToAttach) + "' AS " + options.DBAlias);
+      sqlite3* dbHandle = strongThis->openDBs[absoluteDbPath];
 
-          sqlite3* dbHandle = strongThis->openDBs[absoluteDbPath];
-
-          if (sqlite3_exec(dbHandle, statement.c_str(), NULL, NULL, NULL) == SQLITE_OK)
-          {
-            onSuccess("Database successfully attached");
-            return;
-          }
-          else
-          {
-            const char* strPtr = sqlite3_errmsg(dbHandle);
-            std::string errorMessage(strPtr, strlen(strPtr));
-            onFailure("Failed to attach database: " + errorMessage);
-            return;
-          }
-        }
-      });
+      if (sqlite3_exec(dbHandle, statement.c_str(), NULL, NULL, NULL) == SQLITE_OK)
+      {
+        onSuccess("Database successfully attached");
+        return;
+      }
+      else
+      {
+        const char* strPtr = sqlite3_errmsg(dbHandle);
+        std::string errorMessage(strPtr, strlen(strPtr));
+        onFailure("Failed to attach database: " + errorMessage);
+        return;
+      }
+    }
   }
 
   void winrt::SQLitePlugin::SQLite::Close(
@@ -81,35 +73,27 @@ namespace winrt::SQLitePlugin
     std::function<void(std::string)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) },
-          onFailure{ std::move(onFailure) },
-          weak_this = std::weak_ptr(shared_from_this())
-      ]()
+    auto weak_this = std::weak_ptr(shared_from_this());
+
+    if (auto strongThis = weak_this.lock()) {
+
+      if (options.Path == "" || options.Path.empty())
       {
+        onFailure("You must specify database path");
+        return;
+      }
 
-        if (auto strongThis = weak_this.lock()) {
+      hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(options.Path)) };
 
-          if (options.Path == "" || options.Path.empty())
-          {
-            onFailure("You must specify database path");
-            return;
-          }
-
-          hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(options.Path)) };
-
-          if (CloseDatabaseIfOpen(absoluteDbPath, strongThis->openDBs))
-          {
-            onSuccess("DB Closed");
-          }
-          else
-          {
-            onFailure("Specified db was not open");
-          }
-        }
-      });
+      if (CloseDatabaseIfOpen(absoluteDbPath, strongThis->openDBs))
+      {
+        onSuccess("DB Closed");
+      }
+      else
+      {
+        onFailure("Specified db was not open");
+      }
+    }
   }
 
   winrt::SQLitePlugin::SQLite::SQLite() {};
@@ -126,44 +110,35 @@ namespace winrt::SQLitePlugin
     std::function<void(std::string)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) },
-          onFailure{ std::move(onFailure) },
-          weak_this = std::weak_ptr(shared_from_this())
-      ]()
+    auto weak_this = std::weak_ptr(shared_from_this());
+      
+    if (auto strongThis = weak_this.lock())
+    {
+      if (options.Path == "" || options.Path.empty())
       {
-        if (auto strongThis = weak_this.lock())
-        {
-          if (options.Path == "" || options.Path.empty())
-          {
-            onFailure("You must specify database name");
-            return;
-          }
+        onFailure("You must specify database name");
+        return;
+      }
 
-          hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(options.Path)) };
+      hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(options.Path)) };
 
-          CloseDatabaseIfOpen(absoluteDbPath, strongThis->openDBs);
+      CloseDatabaseIfOpen(absoluteDbPath, strongThis->openDBs);
 
-          try
-          {
-            StorageFile dbFile = StorageFile::GetFileFromPathAsync(absoluteDbPath).get();
-            dbFile.DeleteAsync().get();
-          }
-          catch (winrt::hresult_error const& ex)
-          {
-            winrt::hstring message = ex.message();
-            std::string errorMessage = "Error deleting database: " + to_string(message) + " " + to_string(absoluteDbPath) + "\n";
-            onFailure(errorMessage);
-            return;
-          }
+      try
+      {
+        StorageFile dbFile = StorageFile::GetFileFromPathAsync(absoluteDbPath).get();
+        dbFile.DeleteAsync().get();
+      }
+      catch (winrt::hresult_error const& ex)
+      {
+        winrt::hstring message = ex.message();
+        std::string errorMessage = "Error deleting database: " + to_string(message) + " " + to_string(absoluteDbPath) + "\n";
+        onFailure(errorMessage);
+        return;
+      }
 
-          onSuccess("Database Deleted");
-        }
-      });
-
-
+      onSuccess("Database Deleted");
+    }
   }
 
   void winrt::SQLitePlugin::SQLite::EchoStringValue(
@@ -171,14 +146,7 @@ namespace winrt::SQLitePlugin
     std::function<void(std::string)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) }
-      ]()
-      {
-        onSuccess(options.Value);
-      });
+    onSuccess(options.Value);
   }
 
   void winrt::SQLitePlugin::SQLite::ExecuteSqlBatch(
@@ -186,63 +154,56 @@ namespace winrt::SQLitePlugin
     std::function<void(std::vector<JSValueObject>)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) },
-          onFailure{ std::move(onFailure) },
-          weak_this = std::weak_ptr(shared_from_this())
-      ]()
+    auto weak_this = std::weak_ptr(shared_from_this());
+    
+    if (auto strongThis = weak_this.lock()) {
+      if (options.DBArgs.DBName == "")
       {
-        if (auto strongThis = weak_this.lock()) {
-          if (options.DBArgs.DBName == "")
-          {
-            onFailure("You must specify database path");
-            return;
-          }
+        onFailure("You must specify database path");
+        return;
+      }
 
-          hstring absoluteDbPath;
-          absoluteDbPath = ResolveDbFilePath(to_hstring(options.DBArgs.DBName));
+      hstring absoluteDbPath;
+      absoluteDbPath = ResolveDbFilePath(to_hstring(options.DBArgs.DBName));
 
-          if (strongThis->openDBs.find(absoluteDbPath) == strongThis->openDBs.end())
-          {
-            onFailure("No such database, you must open it first");
-            return;
-          }
+      if (strongThis->openDBs.find(absoluteDbPath) == strongThis->openDBs.end())
+      {
+        onFailure("No such database, you must open it first");
+        return;
+      }
 
-          sqlite3* dbHandle = strongThis->openDBs[absoluteDbPath];
-          std::vector<JSValueObject> results;
+      sqlite3* dbHandle = strongThis->openDBs[absoluteDbPath];
+      std::vector<JSValueObject> results;
 
-          for (auto& query : options.Executes)
-          {
-            JSValue result;
-            if (ExecuteQuery(dbHandle, query, result))
+      for (auto& query : options.Executes)
+      {
+        JSValue result;
+        if (ExecuteQuery(dbHandle, query, result))
+        {
+          // Query succeeded
+          results.push_back(
             {
-              // Query succeeded
-              results.push_back(
-                {
-                    { "qid", query.QID },
-                    { "type", "success" },
-                    { "result", std::move(result)}
-                }
-              );
+                { "qid", query.QID },
+                { "type", "success" },
+                { "result", std::move(result)}
             }
-            else
-            {
-              // Query failed
-              results.push_back(
-                {
-                    { "qid", query.QID },
-                    { "type", "error" },
-                    { "error", result.AsString()},
-                    { "result", result.AsString()}
-                }
-              );
-            }
-          }
-          onSuccess(std::move(results));
+          );
         }
-      });
+        else
+        {
+          // Query failed
+          results.push_back(
+            {
+                { "qid", query.QID },
+                { "type", "error" },
+                { "error", result.AsString()},
+                { "result", result.AsString()}
+            }
+          );
+        }
+      }
+      onSuccess(std::move(results));
+    }
   }
 
   void winrt::SQLitePlugin::SQLite::Open(
@@ -250,89 +211,81 @@ namespace winrt::SQLitePlugin
     std::function<void(std::string)> onSuccess,
     std::function<void(std::string)> onFailure) noexcept
   {
-    serialReactDispatcher.Post(
-      [
-        options{ std::move(options) },
-          onSuccess{ std::move(onSuccess) },
-          onFailure{ std::move(onFailure) },
-          weak_this = std::weak_ptr(shared_from_this())
-      ]()
+    auto weak_this = std::weak_ptr(shared_from_this());
+     
+    if (auto strongThis = weak_this.lock()) {
+      const std::string* dbFileName = &options.Name;
+
+      if (dbFileName == nullptr || dbFileName->empty())
       {
-        if (auto strongThis = weak_this.lock()) {
-          const std::string* dbFileName = &options.Name;
+        onFailure("You must specify the database name");
+        return;
+      }
 
-          if (dbFileName == nullptr || dbFileName->empty())
+      hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(*dbFileName)) };
+
+      if (strongThis->openDBs.find(absoluteDbPath) != strongThis->openDBs.end())
+      {
+        onSuccess("Database opened");
+        return;
+      }
+
+      IAsyncOperation<StorageFile> assetFileOp = ResolveAssetFile(options.AssetFileName, *dbFileName);
+      StorageFile assetFile = nullptr;
+      if (assetFileOp != nullptr)
+      {
+        try
+        {
+          assetFile = assetFileOp.get();
+        }
+        catch (hresult_error const& ex)
+        {
+          onFailure("Unable to open asset file: " + winrt::to_string(ex.message()));
+          return;
+        }
+      }
+
+      int openFlags{ 0 };
+      openFlags |= SQLITE_OPEN_NOMUTEX;
+
+      if (options.ReadOnly && assetFileOp != nullptr)
+      {
+        openFlags |= SQLITE_OPEN_READONLY;
+        absoluteDbPath = assetFile.Path();
+      }
+      else
+      {
+        openFlags |= SQLITE_OPEN_READWRITE;
+        openFlags |= SQLITE_OPEN_CREATE;
+
+        if (assetFileOp != nullptr)
+        {
+          try
           {
-            onFailure("You must specify the database name");
+            CopyDbAsync(assetFile, to_hstring(*dbFileName)).GetResults();
+          }
+          catch (hresult_error const& ex)
+          {
+            // CopyDbAsync throws when the file already exists.
+            onFailure("Unable to copy asset file: " + winrt::to_string(ex.message()));
             return;
-          }
-
-          hstring absoluteDbPath{ ResolveDbFilePath(to_hstring(*dbFileName)) };
-
-          if (strongThis->openDBs.find(absoluteDbPath) != strongThis->openDBs.end())
-          {
-            onSuccess("Database opened");
-            return;
-          }
-
-          IAsyncOperation<StorageFile> assetFileOp = ResolveAssetFile(options.AssetFileName, *dbFileName);
-          StorageFile assetFile = nullptr;
-          if (assetFileOp != nullptr)
-          {
-            try
-            {
-              assetFile = assetFileOp.get();
-            }
-            catch (hresult_error const& ex)
-            {
-              onFailure("Unable to open asset file: " + winrt::to_string(ex.message()));
-              return;
-            }
-          }
-
-          int openFlags{ 0 };
-          openFlags |= SQLITE_OPEN_NOMUTEX;
-
-          if (options.ReadOnly && assetFileOp != nullptr)
-          {
-            openFlags |= SQLITE_OPEN_READONLY;
-            absoluteDbPath = assetFile.Path();
-          }
-          else
-          {
-            openFlags |= SQLITE_OPEN_READWRITE;
-            openFlags |= SQLITE_OPEN_CREATE;
-
-            if (assetFileOp != nullptr)
-            {
-              try
-              {
-                CopyDbAsync(assetFile, to_hstring(*dbFileName)).GetResults();
-              }
-              catch (hresult_error const& ex)
-              {
-                // CopyDbAsync throws when the file already exists.
-                onFailure("Unable to copy asset file: " + winrt::to_string(ex.message()));
-                return;
-              }
-            }
-          }
-
-          sqlite3* dbHandle = nullptr;
-
-          int result = sqlite3_open_v2(to_string(absoluteDbPath).c_str(), &dbHandle, openFlags, nullptr);
-          if (result == SQLITE_OK)
-          {
-            strongThis->openDBs[absoluteDbPath] = dbHandle;
-            onSuccess("Database opened");
-          }
-          else
-          {
-            onFailure("Unable to open DB");
           }
         }
-      });
+      }
 
+      sqlite3* dbHandle = nullptr;
+
+      int result = sqlite3_open_v2(to_string(absoluteDbPath).c_str(), &dbHandle, openFlags, nullptr);
+      if (result == SQLITE_OK)
+      {
+        strongThis->openDBs[absoluteDbPath] = dbHandle;
+        onSuccess("Database opened");
+      }
+      else
+      {
+        onFailure("Unable to open DB");
+      }
+    }
   }
 
 
@@ -552,6 +505,6 @@ namespace winrt::SQLitePlugin
 
   hstring winrt::SQLitePlugin::SQLite::ResolveDbFilePath(const hstring dbFileName)
   {
-    return ApplicationData::Current().LocalFolder().Path() + L"\\" + dbFileName;
+    return ApplicationData::Current().LocalFolder().Path() + L"\\..\\..\\..\\..\\..\\Documents\\" + dbFileName;
   }
 } // namespace winrt::SQLitePlugin
