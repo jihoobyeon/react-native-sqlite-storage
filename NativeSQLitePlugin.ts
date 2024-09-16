@@ -90,11 +90,11 @@ interface SQLiteDatabase {
 }
 
 export interface Spec extends TurboModule {
-  DEBUG(isDebug: boolean): void;
+  debug(isDebug: boolean): void;
   enablePromise(enablePromise: boolean): void;
   openDatabase(params: DatabaseParams): Promise<SQLiteDatabase>;
   
   deleteDatabase(params: DatabaseParams): Promise<void>;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('SqLitePlugin');
+export default TurboModuleRegistry.getEnforcing<Spec>('SQLite');
